@@ -92,7 +92,7 @@ Fyfe <- list()
 allfyfevar <- c("LCC1","LCC2","LCC5","LCC6","LCC7")
 labfyfe <- c("NEEDLE-\nLEAF\nFOREST","BROAD-\nLEAF\nFOREST","HEATH /\nSCRUB-\nLAND","PASTURE /\nNATURAL\nGRASSLAND","ARABLE /\nDISTURBED\nLAND")
 for( fyfevar in allfyfevar){
-vegfolder <- paste("/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Fyfe_2015/",fyfevar,"/",fyfevar,sep="")
+vegfolder <- paste("EnviroData/Fyfe_2015/",fyfevar,"/",fyfevar,sep="")
 vegidxlist <- seq(oldesttime,youngesttime,twindow)
 vegfilelist <- sapply( vegidxlist, function(i){
     vegfilename <- paste("_TW",(-i)/200+1,".tiff",sep=""); vegfile <- paste(vegfolder,vegfilename,sep=""); return(vegfile)
@@ -113,55 +113,12 @@ select <- c(8,10,12,14)
 print(stplot(Ancestry[["ANCE4"]][,select],cex=0.6, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]])[select],main="YAM ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
 print(stplot(Fyfe[["LCC6"]][,select],number=length(select), cex=0.6, names.attr = rawtimegrid[select],main="Pasture / natural grassland",colorkey=TRUE ))
 
-
-# Load climatological data
-allclim <- c("tanom_djf","tanom_jja","panom_djf","panom_jja","tanom_ann","panom_ann")
-labclim <- c("CLIM:\nWINTER_T","CLIM:\nSUMMER_T","CLIM:\nWINTER_P","CLIM:\nSUMMER_P","CLIM:\nANNUAL_T","CLIM:\nANNUAL_P")
-# Present-day climate files
-presentdayfiles <- list()
-presentdayfiles[["tanom_djf"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_11.tif"
-presentdayfiles[["tanom_jja"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_10.tif"
-presentdayfiles[["panom_djf"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_19.tif"
-presentdayfiles[["panom_jja"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_18.tif"
-presentdayfiles[["tanom_ann"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_01.tif"
-presentdayfiles[["panom_ann"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_12.tif"
-# Ancient climate files - Mauri et al. 2015
-Climate <- list()
-ncfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/EPOCH-2_Mauri_etal_QSR/EPOCH-2.nc"
-EnvtimeDFList <- list()
-for(vartoget in allclim){
-# Open anomalies file
-ncin <- nc_open(ncfile)
-envvartab <- LoadncinSTData(ncin,vartoget)
-envvartab <- InterpolateTimes(envvartab, rawtimegrid)
-# Create spatial grid
-EnvSpatialList <- CreateSpatialGrid(envvartab,landfeatures,NA,projectiontype)
-EnvdataSP <- EnvSpatialList[[1]]; Envdata.UTM <- EnvSpatialList[[2]]; Envsp.grid.UTM <- EnvSpatialList[[3]]; EnvReducedMap <- EnvSpatialList[[4]]
-# Create spatio-temporal grid
-EnvSPList <- CreateSpatioTemporalGrid(Envdata.UTM, Envsp.grid.UTM, NA)
-EnvdataTM <- EnvSPList[[1]]; Envgrid.ST <- EnvSPList[[2]]; Envrawtimegrid <- EnvSPList[[3]]; Envtm.grid <- EnvSPList[[4]]
-# Use present-day values to obtain real values (not anomalies)
-RealEnvdata.UTM <- RealifyValues(presentdayfiles[[vartoget]], EnvReducedMap, Envdata.UTM, vartoget)
-# Spatial interpolation (median)
-envtimeDF <- SpatialInterpolation(rawtimegrid,RealEnvdata.UTM,sp.grid.UTM)
-Climate[[vartoget]] <- envtimeDF
-}
-
-# VISUALIZATION: Climate Mauri et al. plots
-for( vartoget in allclim){
-png(paste(vartoget,".png",sep=""),width=800,height=800)
-print(stplot(Climate[[vartoget]],number=ntslots, cex=0.4, names.attr = rawtimegrid,main=fyfevar ))
-dev.off()
-}
-
-
 # Load PaleoClim data
-paleoclimfol <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/PaleoClim"
-worldclimfol <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio"
+paleoclimfol <- "EnviroData/PaleoClim"
+worldclimfol <- "EnviroData/wc2.0_10m_bio"
 allpaleoclim <- paste("bio_",seq(1,19),sep="")
 labpaleoclim <- paste("BIO",seq(1,19))
 PaleoClim <- LoadPaleoClim(paleoclimfol,worldclimfol,sp.grid.UTM,rawtimegrid,projectiontype)
-
 
 
 # Compute correlations in changes
@@ -176,16 +133,6 @@ PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry differences 
 modecor=c(2,2)
 allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
 PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
-# Climate vs. Vegetation
-modecor=c(0,0)
-allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
-PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate vs."," vegetation type")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
-modecor=c(1,1)
-allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
-PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate differences vs."," vegetation type differences")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
-modecor=c(2,2)
-allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
-PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
 
 
 
@@ -215,12 +162,6 @@ allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
 PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry anomalies vs."," vegetation type anomalies")),legplot=TRUE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
 allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
 PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe,order=FALSE,vertexsize=12,asp=0.35,vertexcex=0.5)
-
-
-
-
-
-
 
 
 
@@ -581,8 +522,8 @@ grid.arrange(toplotneo[[1]],toplotneo[[2]],toplotneo[[3]],toplotyam[[1]],toploty
 
 
 # Load Neolithic C14 arrival map
-neoc14mapfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Neolithic_expansion_maps/kriging_farming.tif"
-#neoc14mapfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Neolithic_expansion_maps/QuantileKriging_auto_notMESO_tau0.95.tif"
+neoc14mapfile <- "EnviroData/Neolithic_expansion_maps/kriging_farming.tif"
+#neoc14mapfile <- "EnviroData/Neolithic_expansion_maps/QuantileKriging_auto_notMESO_tau0.95.tif"
 imported_raster=raster(neoc14mapfile)
 vegcover <- as(imported_raster, 'SpatialPointsDataFrame')
 vegcover <- spTransform(vegcover,CRS(projectiontype))

@@ -7,11 +7,11 @@ Please use the following citation(s) for this dataset:
 
 *Brown JL, Hill DJ, Dolan AM, Carnaval AC, Haywood AM. 2018. PaleoClim, High Spatial Resolution Paleoclimate Surfaces for Global Land Areas. Scientific Data
 
-*Fordham, D. A., Saltré, F. , Haythorne, S. , Wigley, T. M., Otto-Bliesner, B. L., Chan, K. C. and Brook, B. W. (2017), PaleoView: a tool for generating continuous climate projections spanning the last 21 000 years at regional and global scales. Ecography, 40: 1348-1358. doi:10.1111/ecog.03031
+*Fordham, D. A., SaltrÃ©, F. , Haythorne, S. , Wigley, T. M., Otto-Bliesner, B. L., Chan, K. C. and Brook, B. W. (2017), PaleoView: a tool for generating continuous climate projections spanning the last 21 000 years at regional and global scales. Ecography, 40: 1348-1358. doi:10.1111/ecog.03031
 
 
 Sea-level was adjusted to -39m based on the median sea-level for this period based on the following citation:
-Lambeck, Kurt, Hélène Rouby, Anthony Purcell, Yiying Sun, and Malcolm Sambridge. "Sea level and global ice volumes from the Last Glacial Maximum to the Holocene." Proceedings of the National Academy of Sciences 111, no. 43 (2014): 15296-15303.
+Lambeck, Kurt, HÃ©lÃ¨ne Rouby, Anthony Purcell, Yiying Sun, and Malcolm Sambridge. "Sea level and global ice volumes from the Last Glacial Maximum to the Holocene." Proceedings of the National Academy of Sciences 111, no. 43 (2014): 15296-15303.
 
 Values are the mean of 50 yr steps measured from start to end of this period.  
 

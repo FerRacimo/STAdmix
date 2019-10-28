@@ -13,7 +13,7 @@ ancestryfile <- "qpas_results/K4.Q.matrix"; ancall <- c("ANCE1","ANCE2","ANCE3",
 timelocfile <- "Data/indstokeep.txt"
 combined <- readkgfiles(famfile,ancestryfile,timelocfile)
 
-#Create a spatial object
+# Create a spatial object
 data <- combined
 coordinates(data)=~LON+LAT
 projection(data)=CRS(projectiontype)
@@ -27,8 +27,6 @@ SpatialList <- CreateSpatialGrid(combined,landfeatures,numgridpoints,projectiont
 dataSP <- SpatialList[[1]]; data.UTM <- SpatialList[[2]]; sp.grid.UTM <- SpatialList[[3]]; ReducedMap <- SpatialList[[4]]
 allanc <- names(data.UTM)[-c(1,2)]
 labanc <- c("ANC:\nNAFR","ANC:\nNEOL","ANC:\nHG","ANC:\nYAM")
-
-
 
 # Create spatio-temporal grid
 #oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
@@ -108,11 +106,6 @@ print(stplot(Fyfe[[fyfevar]],number=ntslots, cex=0.4, names.attr = rawtimegrid,m
 dev.off()
 }
 
-
-select <- c(8,10,12,14)
-print(stplot(Ancestry[["ANCE4"]][,select],cex=0.6, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]])[select],main="YAM ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
-print(stplot(Fyfe[["LCC6"]][,select],number=length(select), cex=0.6, names.attr = rawtimegrid[select],main="Pasture / natural grassland",colorkey=TRUE ))
-
 # Load PaleoClim data
 paleoclimfol <- "EnviroData/PaleoClim"
 worldclimfol <- "EnviroData/wc2.0_10m_bio"
@@ -133,14 +126,6 @@ PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry differences 
 modecor=c(2,2)
 allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
 PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
-
-
-
-modecor=c(2,2)
-allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
-PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe)
-
-
 
 modecor=c(0,0)
 layout(matrix(c(1,2), nrow = 2, ncol = 1, byrow = TRUE))
@@ -164,11 +149,9 @@ allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UT
 PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe,order=FALSE,vertexsize=12,asp=0.35,vertexcex=0.5)
 
 
-
 # Create dataset for linear model
 dataanom.sc.old <- DataForModel(AncestryKrigged, Fyfe, Climate, allanc, allfyfevar, allclim, rawtimegrid, "anom", TRUE)
 dataanom.sc <- DataForModel(AncestryKrigged, Fyfe, PaleoClim, allanc, allfyfevar, allpaleoclim, rawtimegrid, "anom", TRUE)
-
 
 # Plot timeline in a specific site (e.g. Paris)
 range01 <- function(x){(x-min(x))/(max(x)-min(x))}

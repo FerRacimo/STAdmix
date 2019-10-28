@@ -1,0 +1,769 @@
+cd /willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal
+OHANAFOL=/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/bin/ohana/bin
+MATHIESONFOL=/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/MathiesonAncient
+MESONEOFOL=/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/MesoNeo/Data_neo2
+REICHFOL=/willerslev/datasets/v37.2.1240K_HumanOrigins
+
+# Extract ancient and present-day European data
+cd Data
+cp $MATHIESONFOL/extended_metadata.txt .
+cat $MESONEOFOL/neo2.1240k.sampleInfo.txt | awk 'BEGIN{FS="\t"; OFS="\t"}{if( ($15 > 30 && $15 < 75 && $16 > -15 && $16 < 45) && $15 != "NA" && $16 != "NA" && $13 == "TRUE" )print $1,$1,$15,$16,"0"}' > ModernEurope_IDs.txt
+cat extended_metadata.txt | awk 'BEGIN{FS="\t"; OFS="\t"}{print $1"_rnd",$1"_rnd",$4,$5,$6}' | tail -n+2 > Mathieson_IDs.txt
+cat Mathieson_IDs.txt | awk 'BEGIN{FS="\t"; OFS="\t"}{if($3 > 30 && $3 < 75 && $4 > -15 && $4 < 45)print}' > Mathieson_ancientEurope_IDs.txt
+cat Mathieson_ancientEurope_IDs.txt ModernEurope_IDs.txt > indstokeep.txt
+plink -bfile $MESONEOFOL/neo2.1240k --recode12 tab --keep indstokeep.txt --make-bed --out ancient_modernEurope
+
+#cd Data
+#plink -bfile $REICHFOL/v37.2.1240K_HumanOrigins --recode12 tab --keep $REICHFOL/timelocfile_Europe.txt --make-bed --out ancient_modernEurope
+
+cd ..
+
+# Run qpas
+$OHANAFOL/convert ped2dgm Data/ancient_modernEurope.ped Data/ancient_modernEurope.dgm
+#$OHANAFOL/filter rema 200000 Data/ancient_modernEurope.dgm Data/ancient_modernEurope.200k.dgm
+
+mkdir qpas_results
+for i in {2..9}; do (
+echo $i
+$OHANAFOL/qpas Data/ancient_modernEurope.dgm -k $i -qo qpas_results/K${i}.Q.matrix -fo qpas_results/K${i}.F.matrix -e 1 -nt 30
+$OHANAFOL/nemeco Data/ancient_modernEurope.dgm qpas_results/K${i}.F.matrix -co qpas_results/K${i}.C.matrix -mi 5
+$OHANAFOL/convert cov2nwk qpas_results/K${i}.C.matrix qpas_results/K${i}.tree.nwk
+$OHANAFOL/convert nwk2svg qpas_results/K${i}.tree.nwk qpas_results/K${i}.tree.svg ) &
+done
+
+# Extract LCT SNP
+plink --bfile ancient_modernEurope --snp 2:136608646 --out ancient_modernEurope_2_136608646 --recode12
+cat <(echo -e "2 136608646") <(cat ancient_modernEurope_2_136608646.ped | cut -d " " -f 7,8 | sed 's/ /_/g' | \
+awk '{if($1 == "0_0") print "NA"; else if($1 == "1_1") print "0"; else if($1 == "2_2") print "1"}' ) > ancient_modernEurope_2_136608646.txt
+
+# Extract random SNP
+plink --bfile ancient_modernEurope --snp 16:24417536 --out ancient_modernEurope_16_24417536 --recode12
+cat <(echo -e "16 24417536") <(cat ancient_modernEurope_16_24417536.ped | cut -d " " -f 7,8 | sed 's/ /_/g' | \
+awk '{if($1 == "0_0") print "NA"; else if($1 == "1_1") print "0"; else if($1 == "2_2") print "1"; else if($1 == "1_2") print "0.5"}' ) > ancient_modernEurope_16_24417536.txt
+
+
+
+R
+
+# Load functions
+source("STKrigFunc.R")
+
+# Land features
+landfeatures <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/NaturalEarth/ne_50m_land/ne_50m_land.shp"
+projectiontype <- "+init=epsg:4326"
+
+# Load ancestry data
+famfile <- "Data/ancient_modernEurope.fam"
+ancestryfile <- "qpas_results/K4.Q.matrix"; ancall <- c("ANCE1","ANCE2","ANCE3","ANCE4")
+timelocfile <- "Data/indstokeep.txt"
+combined <- readkgfiles(famfile,ancestryfile,timelocfile)
+
+#Create a spatial object
+data <- combined
+coordinates(data)=~LON+LAT
+projection(data)=CRS(projectiontype)
+data.UTM <- spTransform(data,CRS(projectiontype))
+
+# Create spatial grid
+#numgridpoints <- 5000
+#numgridpoints <- 1000
+numgridpoints <- 200
+SpatialList <- CreateSpatialGrid(combined,landfeatures,numgridpoints,projectiontype)
+dataSP <- SpatialList[[1]]; data.UTM <- SpatialList[[2]]; sp.grid.UTM <- SpatialList[[3]]; ReducedMap <- SpatialList[[4]]
+allanc <- names(data.UTM)[-c(1,2)]
+labanc <- c("ANC:\nNAFR","ANC:\nNEOL","ANC:\nHG","ANC:\nYAM")
+
+
+
+# Create spatio-temporal grid
+#oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
+#oldesttime <- -10800; youngesttime <- 0; twindow <- 600; ntslots <- 19
+oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
+SPList <- CreateSpatioTemporalGrid(data.UTM, sp.grid.UTM, ntslots,oldesttime,youngesttime)
+dataTM <- SPList[[1]]; grid.ST <- SPList[[2]]; rawtimegrid <- SPList[[3]]; tm.grid <- SPList[[4]]
+
+# Matrix of neighbors
+pointdists <- spDists(sp.grid.UTM,longlat=TRUE)
+pointsnear <- t(apply(pointdists,1,function(allpoints){neighbortrue <- rank(allpoints) <= 10; return(as.numeric(neighbortrue))}))
+pointsweights <- mat2listw(pointsnear)
+plot(pointsweights,coordinates(sp.grid.UTM))
+
+# Perform Kriging of ancestry data
+AncestryKrigged <- list(); Ancestry <- list()
+for(targetanc in allanc){
+print(targetanc)
+VarioList <- ComputeVariogram(data.UTM, dataSP, dataTM, targetanc, 50)
+timeDF <- VarioList[[1]]; var <- VarioList[[2]]; finalVgm <- VarioList[[3]]; finalVgmMSE <- VarioList[[4]]
+pred <- PerformSPKriging(timeDF,finalVgm,grid.ST)
+attributes(pred)$data <- BoundKriging(attributes(pred)$data, 0, 1)
+AncestryKrigged[[targetanc]] <- list(spobject=timeDF,variogram=var,varmodel=finalVgm,spgrid=sp.grid.UTM,tmgrid=tm.grid,rawtimegrid=rawtimegrid,pred=pred)
+Ancestry[[targetanc]] <- pred
+}
+
+
+# VISUALIZATION - RAW DATA
+land <- readOGR(landfeatures)
+for( i in seq(1,length(allanc))){
+toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=labanc[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 
+toplot[[30]]$name <- as.numeric(as.POSIXct(toplot[[30]]$name,origin="1970-01-01"))
+toplot
+}
+
+# VISUALIZATION - ST KRIGING
+# Plot animation
+for(targetanc in allanc){
+for(i in seq(1,length(rawtimegrid))){
+for(rep in seq(1,10)){
+name <- rename((i-1)*10+rep)
+png(name)
+plot(AncestryKrigged[[targetanc]]$pred[,i],cex=1.5,pch=20,col=bpy.colors(21)[-1][cut(AncestryKrigged[[targetanc]]$pred[,i]@data[[1]],breaks=c(-0.2,seq(0.05,0.95,0.05),1.2),labels=FALSE)],main=as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]])[i])
+dev.off()
+}}
+my_command <- paste('convert -delay 3 *.png ',' ',targetanc,'_animation.gif',sep=""); system(my_command)
+my_command <- 'rm *png'; system(my_command)
+}
+# Plot variogram
+plot(AncestryKrigged[[targetanc]]$variogram,AncestryKrigged[[targetanc]]$varmodel,map=F,all=T)
+attr(AncestryKrigged[[targetanc]]$varmodel,"MSE")
+# Plot spatiotemporal plots
+print(stplot(Ancestry[["ANCE1"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="NAF ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE2"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="NEOL ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE3"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="HG ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE4"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="YAM ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+
+
+# Fyfe et al. 2015
+Fyfe <- list()
+allfyfevar <- c("LCC1","LCC2","LCC5","LCC6","LCC7")
+labfyfe <- c("NEEDLE-\nLEAF\nFOREST","BROAD-\nLEAF\nFOREST","HEATH /\nSCRUB-\nLAND","PASTURE /\nNATURAL\nGRASSLAND","ARABLE /\nDISTURBED\nLAND")
+for( fyfevar in allfyfevar){
+vegfolder <- paste("/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Fyfe_2015/",fyfevar,"/",fyfevar,sep="")
+vegidxlist <- seq(oldesttime,youngesttime,twindow)
+vegfilelist <- sapply( vegidxlist, function(i){
+    vegfilename <- paste("_TW",(-i)/200+1,".tiff",sep=""); vegfile <- paste(vegfolder,vegfilename,sep=""); return(vegfile)
+})
+Fyfe[[fyfevar]] <- LoadVegTifFiles(vegidxlist,vegfilelist,ReducedMap,sp.grid.UTM,projectiontype,100,100)
+}
+
+
+# VISUALIZATION: Fyfe plots
+for( fyfevar in allfyfevar){
+png(paste(fyfevar,".png",sep=""),width=800,height=800)
+print(stplot(Fyfe[[fyfevar]],number=ntslots, cex=0.4, names.attr = rawtimegrid,main=fyfevar ))
+dev.off()
+}
+
+
+select <- c(8,10,12,14)
+print(stplot(Ancestry[["ANCE4"]][,select],cex=0.6, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]])[select],main="YAM ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Fyfe[["LCC6"]][,select],number=length(select), cex=0.6, names.attr = rawtimegrid[select],main="Pasture / natural grassland",colorkey=TRUE ))
+
+
+# Load climatological data
+allclim <- c("tanom_djf","tanom_jja","panom_djf","panom_jja","tanom_ann","panom_ann")
+labclim <- c("CLIM:\nWINTER_T","CLIM:\nSUMMER_T","CLIM:\nWINTER_P","CLIM:\nSUMMER_P","CLIM:\nANNUAL_T","CLIM:\nANNUAL_P")
+# Present-day climate files
+presentdayfiles <- list()
+presentdayfiles[["tanom_djf"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_11.tif"
+presentdayfiles[["tanom_jja"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_10.tif"
+presentdayfiles[["panom_djf"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_19.tif"
+presentdayfiles[["panom_jja"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_18.tif"
+presentdayfiles[["tanom_ann"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_01.tif"
+presentdayfiles[["panom_ann"]] <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio/wc2.0_bio_10m_12.tif"
+# Ancient climate files - Mauri et al. 2015
+Climate <- list()
+ncfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/EPOCH-2_Mauri_etal_QSR/EPOCH-2.nc"
+EnvtimeDFList <- list()
+for(vartoget in allclim){
+# Open anomalies file
+ncin <- nc_open(ncfile)
+envvartab <- LoadncinSTData(ncin,vartoget)
+envvartab <- InterpolateTimes(envvartab, rawtimegrid)
+# Create spatial grid
+EnvSpatialList <- CreateSpatialGrid(envvartab,landfeatures,NA,projectiontype)
+EnvdataSP <- EnvSpatialList[[1]]; Envdata.UTM <- EnvSpatialList[[2]]; Envsp.grid.UTM <- EnvSpatialList[[3]]; EnvReducedMap <- EnvSpatialList[[4]]
+# Create spatio-temporal grid
+EnvSPList <- CreateSpatioTemporalGrid(Envdata.UTM, Envsp.grid.UTM, NA)
+EnvdataTM <- EnvSPList[[1]]; Envgrid.ST <- EnvSPList[[2]]; Envrawtimegrid <- EnvSPList[[3]]; Envtm.grid <- EnvSPList[[4]]
+# Use present-day values to obtain real values (not anomalies)
+RealEnvdata.UTM <- RealifyValues(presentdayfiles[[vartoget]], EnvReducedMap, Envdata.UTM, vartoget)
+# Spatial interpolation (median)
+envtimeDF <- SpatialInterpolation(rawtimegrid,RealEnvdata.UTM,sp.grid.UTM)
+Climate[[vartoget]] <- envtimeDF
+}
+
+# VISUALIZATION: Climate Mauri et al. plots
+for( vartoget in allclim){
+png(paste(vartoget,".png",sep=""),width=800,height=800)
+print(stplot(Climate[[vartoget]],number=ntslots, cex=0.4, names.attr = rawtimegrid,main=fyfevar ))
+dev.off()
+}
+
+
+# Load PaleoClim data
+paleoclimfol <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/PaleoClim"
+worldclimfol <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/wc2.0_10m_bio"
+allpaleoclim <- paste("bio_",seq(1,19),sep="")
+labpaleoclim <- paste("BIO",seq(1,19))
+PaleoClim <- LoadPaleoClim(paleoclimfol,worldclimfol,sp.grid.UTM,rawtimegrid,projectiontype)
+
+
+
+# Compute correlations in changes
+# Ancestry vs. Vegetation
+par(mfrow=c(2,3))
+modecor=c(0,0)
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry vs."," vegetation type")),legplot=TRUE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+modecor=c(1,1)
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry differences vs."," vegetation type differences")),legplot=FALSE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+modecor=c(2,2)
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+# Climate vs. Vegetation
+modecor=c(0,0)
+allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate vs."," vegetation type")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
+modecor=c(1,1)
+allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate differences vs."," vegetation type differences")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
+modecor=c(2,2)
+allcors <- ComputeCors(Climate,Fyfe,allclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labclim,labels2=labfyfe)
+
+
+
+modecor=c(2,2)
+allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe)
+
+
+
+modecor=c(0,0)
+layout(matrix(c(1,2), nrow = 2, ncol = 1, byrow = TRUE))
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry vs."," vegetation type")),legplot=TRUE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate vs."," vegetation type")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe,order=FALSE,vertexsize=12,asp=0.35,vertexcex=0.5)
+
+modecor=c(1,1)
+layout(matrix(c(1,2), nrow = 2, ncol = 1, byrow = TRUE))
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry differences vs."," vegetation type differences")),legplot=TRUE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate differences vs."," vegetation type differences")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe,order=FALSE,vertexsize=12,asp=0.35,vertexcex=0.5)
+
+modecor=c(2,2)
+layout(matrix(c(1,2), nrow = 2, ncol = 1, byrow = TRUE))
+allcors <- ComputeCors(Ancestry,Fyfe,allanc[-1],allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allanc[-1],allfyfevar,bquote(atop("Krigged ancestry anomalies vs."," vegetation type anomalies")),legplot=TRUE,legtil="Correlations",labels1=labanc[-1],labels2=labfyfe)
+allcors <- ComputeCors(PaleoClim,Fyfe,allpaleoclim,allfyfevar,modecor,sp.grid.UTM)
+PlotCor(allcors,allpaleoclim,allfyfevar,bquote(atop("Climate anomalies vs."," vegetation type anomalies")),legplot=FALSE,legtil="Correlations",labels1=labpaleoclim,labels2=labfyfe,order=FALSE,vertexsize=12,asp=0.35,vertexcex=0.5)
+
+
+
+
+
+
+
+
+
+# Create dataset for linear model
+dataanom.sc.old <- DataForModel(AncestryKrigged, Fyfe, Climate, allanc, allfyfevar, allclim, rawtimegrid, "anom", TRUE)
+dataanom.sc <- DataForModel(AncestryKrigged, Fyfe, PaleoClim, allanc, allfyfevar, allpaleoclim, rawtimegrid, "anom", TRUE)
+
+
+# Plot timeline in a specific site (e.g. Paris)
+range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+latlon <- data.frame(attributes(Ancestry[["ANCE2"]])$sp)
+ancpoints1 <- attributes(Ancestry[["ANCE2"]])$data[,1]
+ancpoints2 <- attributes(Ancestry[["ANCE3"]])$data[,1]
+ancpoints3 <- attributes(Ancestry[["ANCE4"]])$data[,1]
+fyfepoints1 <- attributes(Fyfe[["LCC1"]])$data[,1]/100
+fyfepoints2 <- attributes(Fyfe[["LCC2"]])$data[,1]/100
+fyfepoints3 <- attributes(Fyfe[["LCC5"]])$data[,1]/100
+fyfepoints4 <- attributes(Fyfe[["LCC6"]])$data[,1]/100
+fyfepoints5 <- attributes(Fyfe[["LCC7"]])$data[,1]/100
+totalpoints <- length(attributes(Ancestry[["ANCE2"]])$data[,1])
+location <- 95 # Paris
+location <- 41 # Madrid
+location <- 144 # Edinborough
+location <- 161 # Stockholm
+location <- 101 # Krakow
+location <- 59 # Skopje
+location <- 56 # Rome
+allcol <- c("red","orange","purple","blue","dark green","green","cyan","aquamarine")
+plot(rawtimegrid,ancpoints1[seq(location,totalpoints,201)],type="l",ylim=c(0,1),lwd=4,col=allcol[1],ylab="Proportion",xlab="year",cex.lab=1.3)
+lines(rawtimegrid,ancpoints2[seq(location,totalpoints,201)],col=allcol[2],lwd=4)
+lines(rawtimegrid,ancpoints3[seq(location,totalpoints,201)],col=allcol[3],lwd=4)
+lines(rawtimegrid,fyfepoints1[seq(location,totalpoints,201)],col=allcol[4])
+lines(rawtimegrid,fyfepoints2[seq(location,totalpoints,201)],col=allcol[5])
+lines(rawtimegrid,fyfepoints3[seq(location,totalpoints,201)],col=allcol[6])
+lines(rawtimegrid,fyfepoints4[seq(location,totalpoints,201)],col=allcol[7])
+lines(rawtimegrid,fyfepoints5[seq(location,totalpoints,201)],col=allcol[8])
+#legend("topleft",c("NEOL","HG","YAM","NEEDLE-LEAF FOREST","BROAD-LEAF FOREST","HEATH / SCRUBLAND","PASTURE / GRASSLAND","ARABLE / DISTURBED LAND"),cex=1.5,col=allcol,lwd=2,bg="white")
+
+# Plot density of correlations
+corlist <- list()
+for(fyfevar in allfyfevar){
+for( ance in ancall){
+ancpoints <- attributes(Ancestry[[ance]])$data[,1]
+fyfepoints <- attributes(Fyfe[[fyfevar]])$data[,1]/100
+allcors <- c()
+for(location in seq(1,201)){
+allcors <- c(allcors,cor(ancpoints[seq(location,3819,201)],fyfepoints[seq(location,3819,201)]))
+}
+corlist[[paste(ance,fyfevar,sep="_")]] <- allcors
+}}
+
+par(mfrow=c(2,3))
+for(fyfevar in allfyfevar){
+plot(density(corlist[[paste("ANCE2_",fyfevar,sep="")]],from=-1,to=1),col="red",xlim=c(-1,1),ylim=c(0,2.5),main=paste("Density of temporal correlations with ",fyfevar," across space",sep=""),xlab="Correlation")
+lines(density(corlist[[paste("ANCE3_",fyfevar,sep="")]],from=-1,to=1),col="blue")
+lines(density(corlist[[paste("ANCE4_",fyfevar,sep="")]],from=-1,to=1),col="dark green")
+legend("topright",c("NEOL","HG","YAM"),col=c("red","blue","dark green"),lwd=2)
+}
+
+
+
+
+
+# spTimer - w/PaleoClim - exclude bio_7, keep 20% for validation
+
+spTimerdat <- data.frame(dataanom.sc)
+locindex <- as.numeric(factor(paste(spTimerdat$lon,spTimerdat$lat,sep="_")))
+spTimerdat <- cbind(locindex,spTimerdat)
+spTimerdat <- spTimerdat[order(spTimerdat$locindex),]
+#valloc <- sample(seq(1,max(locindex)),round(0.2*max(locindex)))
+#valset <- spTimerdat[which(spTimerdat[,1] %in% valloc),]
+#spTimerdat <- spTimerdat[which(!(spTimerdat[,1] %in% valloc)),]
+spdec <- spT.decay(distribution=Unif(.01,.02), npoints=5)
+#spdec <- spT.decay(distribution=Gamm(a=2, b=1), tuning=0.08)
+allcoefs.gp <- c(); testlist.gp <- list()
+allcoefs.ar <- c(); testlist.ar <- list()
+allcoefs.gp.climonly <- c(); testlist.gp.climonly <- list()
+allcoefs.ar.climonly <- c(); testlist.ar.climonly <- list()
+allcoefs.gp.anconly <- c(); testlist.gp.anconly <- list()
+allcoefs.ar.anconly <- c(); testlist.ar.anconly <- list()
+allcoefs.gp.none <- c(); testlist.gp.none <- list()
+allcoefs.ar.none <- c(); testlist.ar.none <- list()
+for(fyfevar in allfyfevar){
+    modeltouse <- "GP"
+    testlist.gp[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4 + bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.gp <- cbind(allcoefs.gp,ProcessMeans(testlist.gp[[fyfevar]]))
+    testlist.gp.climonly[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.gp.climonly <- cbind(allcoefs.gp.climonly,ProcessMeans(testlist.gp.climonly[[fyfevar]])) 
+    testlist.gp.anconly[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.gp.anconly <- cbind(allcoefs.gp.anconly,ProcessMeans(testlist.gp.anconly[[fyfevar]]))
+    testlist.gp.none[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ 1",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.gp.none <- cbind(allcoefs.gp.none,ProcessMeans(testlist.gp.none[[fyfevar]]))    
+    modeltouse <- "AR"
+    testlist.ar[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4 + bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.ar <- cbind(allcoefs.ar,ProcessMeans(testlist.ar[[fyfevar]]))
+    testlist.ar.climonly[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.ar.climonly <- cbind(allcoefs.ar.climonly,ProcessMeans(testlist.ar.climonly[[fyfevar]]))
+    testlist.ar.anconly[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.ar.anconly <- cbind(allcoefs.ar.anconly,ProcessMeans(testlist.ar.anconly[[fyfevar]]))    
+    testlist.ar.none[[fyfevar]] <- spT.Gibbs(as.formula(paste(fyfevar," ~ 1",sep="")), data=spTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=spdec)
+    allcoefs.ar.none <- cbind(allcoefs.ar.none,ProcessMeans(testlist.ar.none[[fyfevar]]))    
+}
+
+
+# Prediction and Validation
+predlist.gp <- list(); vallist.gp <- list()
+predlist.ar <- list(); vallist.ar <- list()
+predlist.gp.climonly <- list(); vallist.gp.climonly <- list()
+predlist.ar.climonly <- list(); vallist.ar.climonly <- list()
+predlist.gp.anconly <- list(); vallist.gp.anconly <- list()
+predlist.ar.anconly <- list(); vallist.ar.anconly <- list()
+predlist.gp.none <- list(); vallist.gp.none <- list()
+predlist.ar.none <- list(); vallist.ar.none <- list()
+for(fyfevar in allfyfevar){
+predlist.gp[[fyfevar]] <- predict(testlist.gp[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.gp[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.gp[[fyfevar]]$Median)
+predlist.gp.climonly[[fyfevar]] <- predict(testlist.gp.climonly[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.gp.climonly[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.gp.climonly[[fyfevar]]$Median)
+predlist.gp.anconly[[fyfevar]] <- predict(testlist.gp.anconly[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.gp.anconly[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.gp.anconly[[fyfevar]]$Median)
+predlist.gp.none[[fyfevar]] <- predict(testlist.gp.none[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.gp.none[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.gp.none[[fyfevar]]$Median) 
+predlist.ar[[fyfevar]] <- predict(testlist.ar[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.ar[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.ar[[fyfevar]]$Median)
+predlist.ar.climonly[[fyfevar]] <- predict(testlist.ar.climonly[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.ar.climonly[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.ar.climonly[[fyfevar]]$Median)
+predlist.ar.anconly[[fyfevar]] <- predict(testlist.ar.anconly[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.ar.anconly[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.ar.anconly[[fyfevar]]$Median)
+predlist.ar.none[[fyfevar]] <- predict(testlist.ar.none[[fyfevar]], newdata=valset,newcoords=~lon+lat)
+vallist.ar.none[[fyfevar]] <- spT.validation(valset[,fyfevar], predlist.ar.none[[fyfevar]]$Median)
+}
+
+for(lcc in allfyfevar){
+allvar <- testlist.gp[[lcc]]$parameter
+print(paste(signif(allvar[2,c(2,4,5)],3),collapse="|"))
+print(paste(signif(allvar[3,c(2,4,5)],3),collapse="|"))
+print(paste(signif(allvar[4,c(2,4,5)],3),collapse="|"))
+}
+
+for(lcc in allfyfevar){
+allvar <- testlist.ar[[lcc]]$parameter
+print(paste(signif(allvar[2,c(2,4,5)],3),collapse="|"))
+print(paste(signif(allvar[3,c(2,4,5)],3),collapse="|"))
+print(paste(signif(allvar[4,c(2,4,5)],3),collapse="|"))
+}
+
+alltests <- c()
+par(mfrow=c(4,3))
+for(lcc in allfyfevar){
+test <- c(vallist.gp[[lcc]]["RMSE"],vallist.gp.climonly[[lcc]]["RMSE"],vallist.gp.anconly[[lcc]]["RMSE"],vallist.gp.none[[lcc]]["RMSE"])
+alltests <- rbind(alltests,test)
+plot(test,ylim=c(0.5,1),xaxt="n",xlab="",ylab="RMSE",main=paste(lcc," - GP",sep=""),pch=19)
+axis(1,c("BOTH","CLIMATE ONLY","ANCESTRY ONLY","NONE"),at=seq(1,4))
+}
+plot.new()
+for(lcc in allfyfevar){
+test <- c(vallist.ar[[lcc]]["RMSE"],vallist.ar.climonly[[lcc]]["RMSE"],vallist.ar.anconly[[lcc]]["RMSE"],vallist.ar.none[[lcc]]["RMSE"])
+alltests <- rbind(alltests,test)
+plot(test,ylim=c(0.5,1),xaxt="n",xlab="",ylab="RMSE",main=paste(lcc," - AR",sep=""),pch=19)
+axis(1,c("BOTH","CLIMATE ONLY","ANCESTRY ONLY","NONE"),at=seq(1,4))
+}
+
+save(alltests,file="RMSE_valfixed")
+save(alltests,file="RMSE_valunif")
+save(alltests,file="RMSE_valgamma")
+
+
+load("RMSE_valfixed")
+alltests_valfixed <- alltests
+load("RMSE_valunif")
+alltests_valunif <- alltests
+load("RMSE_valgamma")
+alltests_valgamma <- alltests
+
+par(mfrow=c(4,3))
+i <- 1
+for(lcc in c("LCC1","LCC2","LCC5","LCC6","LCC7")){
+plot(alltests_valfixed[i,],ylim=c(0.5,1),xaxt="n",xlab="",ylab="RMSE",main=paste(lcc," - GP",sep=""),pch=19)
+points(alltests_valunif[i,],col="red",pch=21)
+points(alltests_valgamma[i,],col="blue",pch=22)
+axis(1,c("BOTH","CLIMATE ONLY","ANCESTRY ONLY","NONE"),at=seq(1,4))
+i <- i + 1
+}
+plot.new()
+for(lcc in c("LCC1","LCC2","LCC5","LCC6","LCC7")){
+plot(alltests_valfixed[i,],ylim=c(0.5,1),xaxt="n",xlab="",ylab="RMSE",main=paste(lcc," - AR",sep=""),pch=19)
+points(alltests_valunif[i,],col="red",pch=21)
+points(alltests_valgamma[i,],col="blue",pch=22)
+axis(1,c("BOTH","CLIMATE ONLY","ANCESTRY ONLY","NONE"),at=seq(1,4))
+i <- i + 1
+}
+
+
+
+
+par(mfrow=c(2,1))
+PlotCor(allcoefs.gp[seq(1,3),],c(allanc[-1]),allfyfevar,bquote(atop("Ancestry coefficients","(Gaussian process model)")),labels1=c(labanc[-1]),labels2=labfyfe,legplot=TRUE,legtil="Coefficients",legpos="bottomright",vertexsize=40,vertexcex=0.75)
+PlotCor(allcoefs.gp[seq(4,21),],c(allpaleoclim[-7]),allfyfevar,bquote(atop("Climate coefficients","(Gaussian process model)")),labels1=c(labpaleoclim[-7]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",order=FALSE,vertexsize=12,asp=0.3,vertexcex=0.6)
+
+par(mfrow=c(2,1))
+PlotCor(allcoefs.ar[seq(1,3),],c(allanc[-1]),allfyfevar,bquote(atop("Ancestry coefficients","(Autoregressive model)")),labels1=c(labanc[-1]),labels2=labfyfe,legplot=TRUE,legtil="Coefficients",legpos="bottomright",vertexsize=40,vertexcex=0.75)
+PlotCor(allcoefs.ar[seq(4,21),],c(allpaleoclim[-7]),allfyfevar,bquote(atop("Climate coefficients","(Autoregressive model)")),labels1=c(labpaleoclim[-7]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",order=FALSE,vertexsize=12,asp=0.3,vertexcex=0.6)
+
+
+# Model PMCC
+for(fyfevar in allfyfevar){
+    toprint <- rbind(
+    c(testlist.gp[[fyfevar]]$PMCC),
+    c(testlist.gp.old[[fyfevar]]$PMCC),
+    c(testlist.ar[[fyfevar]]$PMCC),
+    c(testlist.ar.old[[fyfevar]]$PMCC)
+    )
+    print(fyfevar)
+    print(toprint)
+}
+
+
+
+
+# Boostrapped parameter estimation
+#bootslist <- parLapply(makeCluster(12,type="FORK",outfile="log.txt"),seq(1,10),function(i){
+bootslist.ar <- list()
+bootslist.gp <- list()
+for(i in seq(1,200)){
+
+print(paste("Iteration: ",i,sep=""))
+# Boostrap dataset
+bootsidx <- unique(sort(sample(length(data.UTM),replace=TRUE)))
+
+# Krig boostrapped dataset
+BootsAncestryKrigged <- list(); BootsAncestry <- list()
+for(targetanc in allanc){
+BootsVarioList <- ComputeVariogram(data.UTM[bootsidx,], dataSP[bootsidx,], dataTM[bootsidx], targetanc, 50)
+BootstimeDF <- BootsVarioList[[1]]; Bootsvar <- BootsVarioList[[2]]; BootsfinalVgm <- BootsVarioList[[3]]; BootsfinalVgmMSE <- BootsVarioList[[4]]
+pred <- PerformSPKriging(BootstimeDF,BootsfinalVgm,grid.ST)
+attributes(pred)$data <- BoundKriging(attributes(pred)$data, 0, 1)
+BootsAncestryKrigged[[targetanc]] <- list(spobject=BootstimeDF,variogram=Bootsvar,varmodel=BootsfinalVgm,spgrid=sp.grid.UTM,tmgrid=tm.grid,rawtimegrid=rawtimegrid,pred=pred)
+BootsAncestry[[targetanc]] <- pred
+}
+
+# Create dataset for linear model
+bootsanom.sc <- DataForModel(BootsAncestryKrigged, Fyfe, PaleoClim, allanc, allfyfevar, allpaleoclim, rawtimegrid, "anom", TRUE)
+bootsspTimerdat <- bootsanom.sc
+locindex <- as.numeric(factor(paste(bootsspTimerdat$lon,bootsspTimerdat$lat,sep="_")))
+bootsspTimerdat <- cbind(locindex,bootsspTimerdat)
+bootsspTimerdat <- bootsspTimerdat[order(bootsspTimerdat$locindex),]
+#spdec <- spT.decay(distribution=Gamm(a=2, b=1), tuning=0.08)
+spdec <- spT.decay(distribution=Unif(.01,.02), npoints=5)
+
+# Apply model to bootstrapped data
+modeltouse <- "GP"
+bootscoefs.gp <- c()
+for(fyfevar in allfyfevar){
+    test <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4 + bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=bootsspTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=bootsspdec)
+    bootscoefs.gp <- cbind(bootscoefs.gp,ProcessMeans(test,zero=FALSE))
+}
+
+# Apply model to bootstrapped data
+#modeltouse <- "AR"
+#bootscoefs.ar <- c()
+#for(fyfevar in allfyfevar){
+#    test <- spT.Gibbs(as.formula(paste(fyfevar," ~ ANCE2 + ANCE3 + ANCE4 + bio_1 + bio_2 + bio_3 + bio_4 + bio_5 + bio_6 + bio_8 + bio_9 + bio_10 + bio_11 + bio_12 + bio_13 + bio_14 + bio_15 + bio_16 + bio_17 + bio_18 + bio_19",sep="")), data=bootsspTimerdat, model=modeltouse,coords=~lon+lat,spatial.decay=bootsspdec)
+#    bootscoefs.ar <- cbind(bootscoefs.ar,ProcessMeans(test,zero=FALSE))
+#}
+
+#bootslist.ar[[i]] <- bootscoefs.ar
+bootslist.gp[[i]] <- bootscoefs.gp
+
+#if(i==1){cat(paste(paste(as.vector(bootscoefs.ar),collapse="\t"),"\n"),file="bootsvals_ar_unif.txt",append=FALSE)
+#} else{cat(paste(paste(as.vector(bootscoefs.ar),collapse="\t"),"\n"),file="bootsvals_ar_unif.txt",append=TRUE)}
+#}
+if(i==1){cat(paste(paste(as.vector(bootscoefs.gp),collapse="\t"),"\n"),file="bootsvals_gp_unif.txt",append=FALSE)
+} else{cat(paste(paste(as.vector(bootscoefs.gp),collapse="\t"),"\n"),file="bootsvals_gp_unif.txt",append=TRUE)}
+}
+
+#return(bootscoefs.ar)
+#})
+
+
+table <- read.table("bootsvals_gp_unif.txt",header=FALSE)
+# GP
+nvars <- 21
+# AR
+#nvars <- 22
+
+sapply( seq(1,5),function(response){
+    sapply( seq(1,3),function(explanatory){
+        allvals <- sapply( seq(1,dim(table)[1]), function(row){
+            test <- matrix(table[row,],nrow=nvars)
+            return(test[explanatory,response])
+        })
+        allvals <- allvals[which(!is.na(allvals))]
+        allvals <- allvals[seq(1,min(100,length(allvals)))]
+        finalmedian <- median(as.numeric(allvals),na.rm=TRUE)
+        qA <- quantile(as.numeric(allvals),0.025,na.rm=TRUE)
+        qB <- quantile(as.numeric(allvals),0.975,na.rm=TRUE)
+        print(c(response,explanatory,paste(signif(finalmedian,3),signif(qA,3),signif(qB,3),sep="|")))
+    })
+    return(NA)
+})
+
+
+allcoefs.gp.boots <- sapply( seq(1,5),function(response){
+    sapply( seq(1,nvars),function(explanatory){
+        allvals <- sapply( seq(1,dim(table)[1]), function(row){
+            test <- matrix(table[row,],nrow=nvars)
+            return(test[explanatory,response])
+        })
+        allvals <- allvals[which(!is.na(allvals))]
+        allvals <- allvals[seq(1,min(100,length(allvals)))]
+        finalmedian <- mean(as.numeric(allvals),na.rm=TRUE)
+        qA <- quantile(as.numeric(allvals),0.025,na.rm=TRUE)
+        qB <- quantile(as.numeric(allvals),0.975,na.rm=TRUE)
+        if(sign(qA)!=sign(qB)){finalmedian <- 0}
+        return(finalmedian)
+    })
+})
+
+
+
+layout(matrix(c(1,3,2,2,4,4), nrow = 3, ncol = 2, byrow = TRUE))
+PlotCor(allcoefs.gp[seq(1,3),],c(allanc[-1]),allfyfevar,bquote(atop("Ancestry coefficients","(Gaussian process model)")),labels1=c(labanc[-1]),labels2=labfyfe,legplot=TRUE,legtil="Coefficients",legpos="topright",vertexsize=40,vertexcex=0.75)
+PlotCor(allcoefs.gp[seq(4,21),],c(allpaleoclim[-7]),allfyfevar,bquote(atop("Climate coefficients","(Gaussian process model)")),labels1=c(labpaleoclim[-7]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",order=FALSE,vertexsize=11,asp=0.3,vertexcex=0.6)
+PlotCor(allcoefs.gp.boots[seq(1,3),],c(allanc[-1]),allfyfevar,bquote(atop("Ancestry coefficients","(Gaussian process model, bootstrapped)")),labels1=c(labanc[-1]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",vertexsize=40,vertexcex=0.75)
+PlotCor(allcoefs.gp.boots[seq(4,21),],c(allpaleoclim[-7]),allfyfevar,bquote(atop("Climate coefficients","(Gaussian process model, bootstrapped)")),labels1=c(labpaleoclim[-7]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",order=FALSE,vertexsize=11,asp=0.3,vertexcex=0.5)
+
+par(mfrow=c(2,1))
+PlotCor(allcoefs.gp.boots[seq(1,3),],c(allanc[-1]),allfyfevar,bquote(atop("Ancestry coefficients","(Gaussian process model, bootstrapped)")),labels1=c(labanc[-1]),labels2=labfyfe,legplot=TRUE,legtil="Coefficients",legpos="bottomright",vertexsize=40,vertexcex=0.75)
+PlotCor(allcoefs.gp.boots[seq(4,21),],c(allpaleoclim[-7]),allfyfevar,bquote(atop("Climate coefficients","(Gaussian process model, bootstrapped)")),labels1=c(labpaleoclim[-7]),labels2=labfyfe,legplot=FALSE,legtil="Coefficients",legpos="bottomright",order=FALSE,vertexsize=12,asp=0.3,vertexcex=0.6)
+
+
+
+# Map of arrival times 
+arrivalmaplist <- list()
+for(targetanc in c("ANCE2","ANCE4")){
+for( anccutoff in c(0.25,0.5,0.75)){
+allfirsttimes <- c()
+locidx <- data.frame(Ancestry[[targetanc]])$sp.ID
+for(loc in unique(locidx)){
+extrdata <- data.frame(Ancestry[[targetanc]])[which(locidx == as.character(loc)),]
+allhigher <- extrdata[which(extrdata$var1.pred > anccutoff),]
+first <- allhigher[1,]
+firsttime <- first$time
+allfirsttimes <- c(allfirsttimes,firsttime)
+#print(firsttime)
+}
+arrivalmap <- SpatialPointsDataFrame(coordinates(sp.grid.UTM),data.frame(allfirsttimes))
+arrivalmaplist[[paste(targetanc,"_",anccutoff,sep="")]] <- arrivalmap
+}}
+
+par(mfrow=c(2,3))
+land <- readOGR(landfeatures)
+targetanc <- "ANCE2"; labelanc <- "Neolithic farmer"
+toplotneo <- lapply(c(0.25,0.5,0.75), function(anccutoff) {spplot(arrivalmaplist[[paste(targetanc,"_",anccutoff,sep="")]],colorkey=TRUE,main=paste("First arrival: ",labelanc," ancestry > ",anccutoff*100,"%",sep=""),cex=0.8,cex.main=0.7,sp.layout=list("sp.polygons",land))})
+targetanc <- "ANCE4"; labelanc <- "Yamnaya steppe"
+toplotyam <- lapply(c(0.25,0.5,0.75), function(anccutoff) {spplot(arrivalmaplist[[paste(targetanc,"_",anccutoff,sep="")]],colorkey=TRUE,main=paste("First arrival: ",labelanc," ancestry > ",anccutoff*100,"%",sep=""),cex=0.8,cex.main=0.7,sp.layout=list("sp.polygons",land))})
+grid.arrange(toplotneo[[1]],toplotneo[[2]],toplotneo[[3]],toplotyam[[1]],toplotyam[[2]],toplotyam[[3]],nrow=2)
+
+
+# Load Neolithic C14 arrival map
+neoc14mapfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Neolithic_expansion_maps/kriging_farming.tif"
+#neoc14mapfile <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/SpatioTemporal/EnviroData/Neolithic_expansion_maps/QuantileKriging_auto_notMESO_tau0.95.tif"
+imported_raster=raster(neoc14mapfile)
+vegcover <- as(imported_raster, 'SpatialPointsDataFrame')
+vegcover <- spTransform(vegcover,CRS(projectiontype))
+names(vegcover) <- "allfirsttimes"
+vegcover <- vegcover[ReducedMap,]
+vegcovermed <- krige(allfirsttimes~1, vegcover, sp.grid.UTM, nmax=5,set = list(method = "med"))
+vegcovermed <- vegcovermed[,1]
+names(vegcovermed) <- "VALUE"
+vegcovermed$VALUE <- -vegcovermed$VALUE
+spplot(vegcovermed,colorkey=TRUE)
+
+broadcuts=seq(-11000,-3000,1000)
+labcuts=seq(-11000,-3000,200)
+labprops=seq(0,1,length.out=length(labcuts))
+broadprops=seq(0,1,length.out=length(broadcuts))
+spplot(vegcovermed,sp.layout=list("sp.polygons",land),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col = bpy.colors(length(labprops)), labels = list(at = broadprops,labels = broadcuts
+))))))
+spplot(arrivalmaplist[["ANCE2_0.75"]],sp.layout=list("sp.polygons",land),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col = bpy.colors(length(labprops)), labels = list(at = broadprops,labels = broadcuts
+))))))
+
+library(viridis)
+par(mfrow=c(3,2))
+broadcuts=seq(-11000,-3000,1000)
+labcuts=seq(-11000,-3000,200)
+p1 <- spplot(arrivalmaplist[["ANCE2_0.5"]],sp.layout=list("sp.polygons",land),col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+p2 <- spplot(arrivalmaplist[["ANCE2_0.75"]],sp.layout=list("sp.polygons",land),col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+p3 <- spplot(vegcovermed,sp.layout=list("sp.polygons",land),col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col = rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+broadcuts=seq(-8000,0,1000)
+labcuts=seq(-8000,0,200)
+p4 <- spplot(arrivalmaplist[["ANCE4_0.5"]],sp.layout=list("sp.polygons",land),col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+p5 <- spplot(arrivalmaplist[["ANCE4_0.75"]],sp.layout=list("sp.polygons",land),col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+grid.arrange(p1,p2,p3,p4,p5,nrow=2)
+
+
+diff <- arrivalmaplist[["ANCE2_0.5"]]$allfirsttimes - vegcovermed$allfirsttimes
+diff <- SpatialPointsDataFrame(as.data.frame(sp.grid.UTM),as.data.frame(diff))
+spplot(diff,colorkey=TRUE)
+
+
+
+
+# Time vs. distance from origin
+
+lmodellist <- list()
+for(anc in c("neol","yam")){
+for(ancprop in c(0.5,0.75)){
+if(anc == "neol"){samples <- combined[which(combined$ANCE2 > ancprop & combined$TIME > 5000),]}
+if(anc == "yam"){samples <- combined[which(combined$ANCE4 > ancprop & combined$TIME > 3000),]}
+timedist <- data.frame(t(apply(samples,1,function(sample){
+    lat <- as.numeric(sample[2])
+    lon <- as.numeric(sample[3])
+    time <- as.numeric(sample[4])
+    if(anc == "yam"){disttoCayonu <- distHaversine(c(lat,lon),c(49.48,43.66))/1000}
+    if(anc == "neol"){disttoCayonu <- distHaversine(c(lat,lon),c(37.38,40.3))/1000}
+    print(c(disttoCayonu,time))
+})))
+colnames(timedist) <- c("dist","time")
+lmodellist[[paste(anc,"_",ancprop,sep="")]] <- lmodel2(time ~ dist, data = timedist,range.y = "relative",range.x = "interval",nperm=99)
+}}
+
+
+
+# Hunt et al. correlation map analysis
+cormaplist <- list()
+for(anc in c("neol","yam")){
+for(ancprop in c(0.5,0.75)){
+if(anc == "neol"){samples <- combined[which(combined$ANCE2 > ancprop & combined$TIME > 5000),]}
+if(anc == "yam"){samples <- combined[which(combined$ANCE4 > ancprop & combined$TIME > 3000),]}
+origincors <- t(apply(data.frame(sp.grid.UTM),1,function(loc){
+lon <- loc[1]
+lat <- loc[2]
+origin <- c(lat,lon)
+timedist <- data.frame(t(apply(samples,1,function(sample){
+    lat <- as.numeric(sample[2])
+    lon <- as.numeric(sample[3])
+    time <- as.numeric(sample[4])
+    disttoCayonu <- distHaversine(c(lat,lon),origin)/1000
+    return(c(disttoCayonu,time))
+})))
+colnames(timedist) <- c("dist","time")
+modelpam <- lmodel2(time ~ dist, data = timedist,range.y = "relative",range.x = "interval",nperm=99)
+corcoef=modelpam$r
+print(c(origin,corcoef))
+return(c(origin,corcoef))
+}))
+originmap <- SpatialPointsDataFrame(data.frame(origincors[,c(2,1)]), data.frame(origincors[,3]))
+names(originmap) <- "Correlation"
+cormaplist[[paste(anc,"_",ancprop,sep="")]] <- originmap
+}}
+
+#spplot(cormaplist[["yam_0.75"]],colorkey=TRUE,sp.layout=list("sp.polygons",land),cex=3)
+filtered <- cormaplist[["yam_0.5"]][which( attributes(cormaplist[["yam_0.75"]])$coords[,1] > 25 & attributes(cormaplist[["yam_0.75"]])$coords[,2] < 60),]
+spplot(filtered,colorkey=TRUE,sp.layout=list("sp.polygons",land),cex=3)
+#spplot(cormaplist[["neol_0.75"]],colorkey=TRUE,sp.layout=list("sp.polygons",land),cex=3)
+filtered <- cormaplist[["neol_0.5"]][which( attributes(cormaplist[["neol_0.75"]])$coords[,1] > 25 & attributes(cormaplist[["neol_0.75"]])$coords[,2] < 60),]
+spplot(filtered,colorkey=TRUE,sp.layout=list("sp.polygons",land),cex=3)
+
+
+broadcuts=round(seq(-0.65,0.1,0.05),4)
+labcuts=round(seq(-0.65,0.1,0.05),4)
+labprops=seq(0,1,length.out=length(labcuts))
+broadprops=seq(0,1,length.out=length(broadcuts))
+filtered <- cormaplist[["yam_0.5"]][which( attributes(cormaplist[["yam_0.5"]])$coords[,1] > 15 & attributes(cormaplist[["yam_0.5"]])$coords[,2] < 70),]
+spplot(filtered,main="Correlation coefficient (YAM ancestry > 50% )",sp.layout=list("sp.polygons",land),cex=2,col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+
+broadcuts=round(seq(-0.7,0.3,0.05),4)
+labcuts=round(seq(-0.7,0.3,0.05),4)
+labprops=seq(0,1,length.out=length(labcuts))
+broadprops=seq(0,1,length.out=length(broadcuts))
+filtered <- cormaplist[["neol_0.5"]][which( attributes(cormaplist[["neol_0.5"]])$coords[,1] > 15 & attributes(cormaplist[["neol_0.5"]])$coords[,2] < 70),]
+spplot(filtered,main="Correlation coefficient (NEOL ancestry > 50% )",sp.layout=list("sp.polygons",land),cex=2,col.regions=rev(magma(length(labprops))),cuts=labcuts,colorkey=list(right = list(fun = draw.colorkey,args = list(key = list(at = labprops, col =rev(magma(length(labprops))), labels = list(at = broadprops,labels = broadcuts
+))))))
+
+
+
+lmodellist[["neol_0.5"]]$r
+speed=signif(-1/lmodellist[["neol_0.5"]]$regression.results[4,3],2)
+print(speed)
+
+
+par(mfrow=c(2,2))
+for(ancprop in c(0.5,0.75)){
+for(anc in c("neol","yam")){
+if(anc=="neol"){origin="37.38N, 40.39E";limy=c(5000,10000);anclab <- "NEOL"}
+if(anc=="yam"){origin="49.48N, 43.66E";limy=c(3000,8000); anclab <- "YAM"}
+plot(lmodellist[[paste(anc,ancprop,sep="_")]], "MA",xlab=paste("distance to ",origin,sep=""),ylab="years BP",main=paste("Genomes with > ",round(ancprop*100),"% ",anclab," ancestry",sep=""),pch=19,xlim=c(0,4500),ylim=limy)
+speed=signif(-1/lmodellist[[paste(anc,ancprop,sep="_")]]$regression.results[4,3],2)
+CI1=signif(-1/lmodellist[[paste(anc,ancprop,sep="_")]]$confidence.intervals[4,4],2)
+CI2=signif(-1/lmodellist[[paste(anc,ancprop,sep="_")]]$confidence.intervals[4,5],2)
+legend("topright",paste("Est. front speed = ",speed," km/year (CI: ",CI1,"-",CI2,")",sep=""))
+}}
+
+

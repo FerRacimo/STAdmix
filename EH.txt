@@ -1,0 +1,42 @@
+Paleoclim.org Bioclmate Variables - mean values
+________________________________________________________________________________________________________________________________
+Layers: Early-Holocene - Greenlandian period in the Late Pleistocene (11.7-8.326 ka BP),Version 1.0, 10/19/2018			
+				
+					
+Please use the following citation(s) for this dataset:
+
+*Brown JL, Hill DJ, Dolan AM, Carnaval AC, Haywood AM. 2018. PaleoClim, High Spatial Resolution Paleoclimate Surfaces for Global Land Areas. Scientific Data
+
+*Fordham, D. A., Saltré, F. , Haythorne, S. , Wigley, T. M., Otto-Bliesner, B. L., Chan, K. C. and Brook, B. W. (2017), PaleoView: a tool for generating continuous climate projections spanning the last 21 000 years at regional and global scales. Ecography, 40: 1348-1358. doi:10.1111/ecog.03031
+
+
+Sea-level was adjusted to -39m based on the median sea-level for this period based on the following citation:
+Lambeck, Kurt, Hélène Rouby, Anthony Purcell, Yiying Sun, and Malcolm Sambridge. "Sea level and global ice volumes from the Last Glacial Maximum to the Holocene." Proceedings of the National Academy of Sciences 111, no. 43 (2014): 15296-15303.
+
+Values are the mean of 50 yr steps measured from start to end of this period.  
+
+_______________________________________________________________________________________________________________________________
+The latest versions of paleoclimate bioclimatic data are freely available at http://www.paleoclim.org. For questions or suggestions regarding PaleoClim, go to our Google Group (https://groups.google.com/forum/#!forum/paleoclim) or email paleoclim@gmail.com. 
+
+All data are feely available under the Creative Commons License: CC BY-NC-SA.
+
+             ___.....___
+       ,..-.=--.-.       "".
+     .{_..        `        ,. .
+   .'     \      /        | ,'.\`.
+  /        :   ;'          `____> \
+ :         `. (           /       :
+ |           `>\_         \      r|
+             /   \         `._   \
+ |          |      `          ;   |
+  :          \     /          `   ;
+   \          \.  '            ` /
+     `.        | /             .'
+        `      `/          . '
+           `---'.....---''
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |P|a|l|e|o|c|l|i|m|.|o|r|g|
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+

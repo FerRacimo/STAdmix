@@ -4,7 +4,7 @@ R
 source("STKrigFunc.R")
 
 # Land features
-landfeatures <- "/willerslev/users-shared/science-snm-willerslev-rgf352/fernando/NaturalEarth/ne_50m_land/ne_50m_land.shp"
+landfeatures <- "NaturalEarth/ne_50m_land/ne_50m_land.shp"
 projectiontype <- "+init=epsg:4326"
 
 # Load ancestry data

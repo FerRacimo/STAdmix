@@ -82,3 +82,6 @@ toplot[[30]]$name <- as.numeric(as.POSIXct(toplot[[30]]$name,origin="1970-01-01"
 toplot
 }
 ```
+
+<img src="https://github.com/FerRacimo/STAdmix/blob/master/NEOL.png" height="300">
+

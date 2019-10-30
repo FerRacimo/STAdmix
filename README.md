@@ -1,5 +1,4 @@
-# STAdmix
-Spatio-temporal analysis of admixture components
+# Spatio-temporal analysis of admixture components
 
 These are scripts and commands used for the analysis in Racimo et al. 'A geostatistical approach to modelling human Holocene
 migrations in Europe using ancient DNA' which is available in bioRxiv. The full list of analyses is in the file 'SpatioTemporal_Notes.txt'.

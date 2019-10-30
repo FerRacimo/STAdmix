@@ -17,7 +17,6 @@ We then load the land feature data, which was obtained from https://www.naturale
 
 ```
 landfeatures <- "NaturalEarth/ne_50m_land/ne_50m_land.shp"
-projectiontype <- "+init=epsg:4326"
 land <- readOGR(landfeatures)
 ```
 
@@ -31,33 +30,33 @@ timelocfile <- "Data/indstokeep.txt"
 combined <- readkgfiles(famfile,ancestryfile,timelocfile,type="ohana",allowmissloc=TRUE,oldesttime=13000,minlat=35,maxlat=72,minlon=-20,maxlon=80)
 ```
 
-# Create a spatial object
+We now create a spatial object for our data
+
+```
 data <- combined
 coordinates(data)=~LON+LAT
+projectiontype <- "+init=epsg:4326"
 projection(data)=CRS(projectiontype)
 data.UTM <- spTransform(data,CRS(projectiontype))
+```
 
-# Create spatial grid
-#numgridpoints <- 5000
-#numgridpoints <- 1000
+We now create a spatial grid with 200 grid points:
+
+```
 numgridpoints <- 200
 SpatialList <- CreateSpatialGrid(combined,landfeatures,numgridpoints,projectiontype)
 dataSP <- SpatialList[[1]]; data.UTM <- SpatialList[[2]]; sp.grid.UTM <- SpatialList[[3]]; ReducedMap <- SpatialList[[4]]
 allanc <- names(data.UTM)[-c(1,2)]
-labanc <- c("ANC:\nNAFR","ANC:\nNEOL","ANC:\nHG","ANC:\nYAM")
+```
 
-# Create spatio-temporal grid
-#oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
-#oldesttime <- -10800; youngesttime <- 0; twindow <- 600; ntslots <- 19
+We then create a spatio-temporal grid spanning the last 10,800 years, in 200-year intervals.
+
+```
 oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
 SPList <- CreateSpatioTemporalGrid(data.UTM, sp.grid.UTM, ntslots,oldesttime,youngesttime)
 dataTM <- SPList[[1]]; grid.ST <- SPList[[2]]; rawtimegrid <- SPList[[3]]; tm.grid <- SPList[[4]]
+```
 
-# Matrix of neighbors
-pointdists <- spDists(sp.grid.UTM,longlat=TRUE)
-pointsnear <- t(apply(pointdists,1,function(allpoints){neighbortrue <- rank(allpoints) <= 10; return(as.numeric(neighbortrue))}))
-pointsweights <- mat2listw(pointsnear)
-plot(pointsweights,coordinates(sp.grid.UTM))
 
 # Perform Kriging of ancestry data
 AncestryKrigged <- list(); Ancestry <- list()
@@ -73,6 +72,7 @@ Ancestry[[targetanc]] <- pred
 
 
 # VISUALIZATION - RAW DATA
+labanc <- c("ANC:\nNAFR","ANC:\nNEOL","ANC:\nHG","ANC:\nYAM")
 land <- readOGR(landfeatures)
 for( i in seq(1,length(allanc))){
 toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=labanc[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 

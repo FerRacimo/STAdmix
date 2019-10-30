@@ -57,7 +57,7 @@ dataTM <- SPList[[1]]; grid.ST <- SPList[[2]]; rawtimegrid <- SPList[[3]]; tm.gr
 ```
 
 
-We are now ready to perform the spatio-temporal kriging of each of our ancestries. This is a two-step process. First, we must fit the spatio-temporal variogram (using the ComputeVariogram function). Then, we perform the actual kriging projection using the fitted variogram (using the PerformSPKriging function). The BoundKriging function ensures all our projected ancestry values are between 0 and 1.
+We are now ready to perform the spatio-temporal kriging of each of our ancestries. This is a two-step process. First, we must fit the spatio-temporal variogram (using the ComputeVariogram function, specifying 50 time lags of 60 years each). Then, we perform the actual kriging projection using the fitted variogram (using the PerformSPKriging function). The BoundKriging function ensures all our projected ancestry values are between 0 and 1.
 
 ```
 AncestryKrigged <- list(); Ancestry <- list()

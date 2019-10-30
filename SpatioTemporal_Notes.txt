@@ -5,7 +5,7 @@ source("STKrigFunc.R")
 
 # Land features
 landfeatures <- "NaturalEarth/ne_50m_land/ne_50m_land.shp"
-projectiontype <- "+init=epsg:4326"
+land <- readOGR(landfeatures)
 
 # Load ancestry data
 famfile <- "Data/ancient_modernEurope.fam"
@@ -14,6 +14,7 @@ timelocfile <- "Data/indstokeep.txt"
 combined <- readkgfiles(famfile,ancestryfile,timelocfile)
 
 # Create a spatial object
+projectiontype <- "+init=epsg:4326"
 data <- combined
 coordinates(data)=~LON+LAT
 projection(data)=CRS(projectiontype)
@@ -55,7 +56,6 @@ Ancestry[[targetanc]] <- pred
 
 
 # VISUALIZATION - RAW DATA
-land <- readOGR(landfeatures)
 for( i in seq(1,length(allanc))){
 toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=labanc[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 
 toplot[[30]]$name <- as.numeric(as.POSIXct(toplot[[30]]$name,origin="1970-01-01"))

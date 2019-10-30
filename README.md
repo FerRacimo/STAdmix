@@ -4,7 +4,7 @@ Spatio-temporal analysis of admixture components
 These are scripts and commands used for the analysis in Racimo et al. 'A geostatistical approach to modelling human Holocene
 migrations in Europe using ancient DNA' which is available in bioRxiv. The full list of analyses is in the file 'SpatioTemporal_Notes.txt'.
 
-Below is a brief tutorial for performing spatio-temporal kriging of ancestry data:
+Below is a brief tutorial for performing spatio-temporal kriging of ancestry data. We will assume we have already performed admixture component inference on our data, using the program Ohana (Cheng et al. 2017). The resulting Q matrix is available in this repository, in the folder 'Data'.
 
 First, we load the necessary functions and libraries in R:
 

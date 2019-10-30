@@ -6,22 +6,30 @@ migrations in Europe using ancient DNA' which is available in bioRxiv. The full 
 
 Below is a brief tutorial for performing spatio-temporal kriging of ancestry data:
 
-First we load the necessary functions in R:
+First, we load the necessary functions and libraries in R:
 
 ```
-# Load functions
+R
 source("STKrigFunc.R")
 ```
 
-# Land features
+We then load the land feature data, which was obtained from https://www.naturalearthdata.com:
+
+```
 landfeatures <- "NaturalEarth/ne_50m_land/ne_50m_land.shp"
 projectiontype <- "+init=epsg:4326"
+land <- readOGR(landfeatures)
+```
 
-# Load ancestry data
+Then, we load the labels for all individuals (a fam file in plink format), the ancestry data (a Q matrix from Ohana or other admixture inference program), the labels for the ancestries (defined by the user) and meta-data with time and location information for each individual. The readkgfiles function combines all this data into a new variable called 'combined'. The option type fed into this function can be 'ohana' (if the ancestry Q matrix is in the format outputted by Ohana, Cheng et al. 2017) or 'admixture' (if the ancestry Q matrix is in the format outputted by the program Admixture, Alexander et al. 2009).
+
+```
 famfile <- "Data/ancient_modernEurope.fam"
-ancestryfile <- "qpas_results/K4.Q.matrix"; ancall <- c("ANCE1","ANCE2","ANCE3","ANCE4")
+ancestryfile <- "qpas_results/K4.Q.matrix"
+ancall <- c("ANCE1","ANCE2","ANCE3","ANCE4")
 timelocfile <- "Data/indstokeep.txt"
-combined <- readkgfiles(famfile,ancestryfile,timelocfile)
+combined <- readkgfiles(famfile,ancestryfile,timelocfile,type="ohana",allowmissloc=TRUE,oldesttime=13000,minlat=35,maxlat=72,minlon=-20,maxlon=80)
+```
 
 # Create a spatial object
 data <- combined

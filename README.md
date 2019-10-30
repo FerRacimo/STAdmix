@@ -76,11 +76,10 @@ Ancestry[[targetanc]] <- pred
 We can visualize the results as follows:
 
 ```
-for( i in seq(1,length(allanc))){
-toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=ancall[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 
-toplot[[30]]$name <- as.numeric(as.POSIXct(toplot[[30]]$name,origin="1970-01-01"))
-toplot
-}
+print(stplot(Ancestry[["ANCE1"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="ANCESTRY 1",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE2"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="ANCESTRY 2",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE3"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="ANCESTRY 3",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+print(stplot(Ancestry[["ANCE4"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="ANCESTRY 4",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
 ```
 
 <img src="https://github.com/FerRacimo/STAdmix/blob/master/NEOL.png" height="300">

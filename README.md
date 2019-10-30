@@ -84,4 +84,7 @@ toplot
 ```
 
 <img src="https://github.com/FerRacimo/STAdmix/blob/master/NEOL.png" height="300">
+<img src="https://github.com/FerRacimo/STAdmix/blob/master/YAM.png" height="300">
+<img src="https://github.com/FerRacimo/STAdmix/blob/master/HG.png" height="300">
+<img src="https://github.com/FerRacimo/STAdmix/blob/master/NAF.png" height="300">
 

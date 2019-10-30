@@ -30,7 +30,7 @@ timelocfile <- "Data/indstokeep.txt"
 combined <- readkgfiles(famfile,ancestryfile,timelocfile,type="ohana",allowmissloc=TRUE,oldesttime=13000,minlat=35,maxlat=72,minlon=-20,maxlon=80)
 ```
 
-We now create a spatial object for our data
+We now create a spatial object for our data, using the WGS84 (EPSG: 4326) coordinate reference system.
 
 ```
 data <- combined
@@ -40,7 +40,7 @@ projection(data)=CRS(projectiontype)
 data.UTM <- spTransform(data,CRS(projectiontype))
 ```
 
-We now create a spatial grid with 200 grid points:
+We now create a spatial grid with 200 grid points.
 
 ```
 numgridpoints <- 200
@@ -58,7 +58,9 @@ dataTM <- SPList[[1]]; grid.ST <- SPList[[2]]; rawtimegrid <- SPList[[3]]; tm.gr
 ```
 
 
-# Perform Kriging of ancestry data
+We are now ready to perform the spatio-temporal kriging of each of our ancestries. This is a two-step process. First, we must fit the spatio-temporal variogram (using the ComputeVariogram function). Then, we perform the actual kriging projection using the fitted variogram (using the PerformSPKriging function). The BoundKriging function ensures all our projected ancestry values are between 0 and 1.
+
+```
 AncestryKrigged <- list(); Ancestry <- list()
 for(targetanc in allanc){
 print(targetanc)
@@ -69,35 +71,15 @@ attributes(pred)$data <- BoundKriging(attributes(pred)$data, 0, 1)
 AncestryKrigged[[targetanc]] <- list(spobject=timeDF,variogram=var,varmodel=finalVgm,spgrid=sp.grid.UTM,tmgrid=tm.grid,rawtimegrid=rawtimegrid,pred=pred)
 Ancestry[[targetanc]] <- pred
 }
+```
 
 
-# VISUALIZATION - RAW DATA
-labanc <- c("ANC:\nNAFR","ANC:\nNEOL","ANC:\nHG","ANC:\nYAM")
-land <- readOGR(landfeatures)
+We can visualize the results as follows:
+
+```
 for( i in seq(1,length(allanc))){
-toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=labanc[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 
+toplot <- stplot(AncestryKrigged[[allanc[i]]]$spobject,colorkey=TRUE,main=ancall[i],number=10,mode="tp",sp.layout=list("sp.polygons",land)) 
 toplot[[30]]$name <- as.numeric(as.POSIXct(toplot[[30]]$name,origin="1970-01-01"))
 toplot
 }
-
-# VISUALIZATION - ST KRIGING
-# Plot animation
-for(targetanc in allanc){
-for(i in seq(1,length(rawtimegrid))){
-for(rep in seq(1,10)){
-name <- rename((i-1)*10+rep)
-png(name)
-plot(AncestryKrigged[[targetanc]]$pred[,i],cex=1.5,pch=20,col=bpy.colors(21)[-1][cut(AncestryKrigged[[targetanc]]$pred[,i]@data[[1]],breaks=c(-0.2,seq(0.05,0.95,0.05),1.2),labels=FALSE)],main=as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]])[i])
-dev.off()
-}}
-my_command <- paste('convert -delay 3 *.png ',' ',targetanc,'_animation.gif',sep=""); system(my_command)
-my_command <- 'rm *png'; system(my_command)
-}
-# Plot variogram
-plot(AncestryKrigged[[targetanc]]$variogram,AncestryKrigged[[targetanc]]$varmodel,map=F,all=T)
-attr(AncestryKrigged[[targetanc]]$varmodel,"MSE")
-# Plot spatiotemporal plots
-print(stplot(Ancestry[["ANCE1"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="NAF ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
-print(stplot(Ancestry[["ANCE2"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="NEOL ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
-print(stplot(Ancestry[["ANCE3"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="HG ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
-print(stplot(Ancestry[["ANCE4"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="YAM ancestry",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))
+```

@@ -72,8 +72,16 @@ Ancestry[[targetanc]] <- pred
 }
 ```
 
+For a given ancestry, we can visualize the empirical and fitted spatio-temporal variograms as follows:
 
-We can visualize the results as follows:
+```
+targetanc <- "ANCE4"
+plot(AncestryKrigged[[targetanc]]$variogram,AncestryKrigged[[targetanc]]$varmodel,map=F,all=T)
+```
+
+<img src="https://github.com/FerRacimo/STAdmix/blob/master/Variogram_YAM.png" height="300">
+
+We can also visualize the kriging results as follows:
 
 ```
 print(stplot(Ancestry[["ANCE1"]],cex=0.5, names.attr = as.character(AncestryKrigged[[targetanc]][["rawtimegrid"]]),main="ANCESTRY 1",colorkey=TRUE,ylim=c(35,70),xlim=c(-12,35)))

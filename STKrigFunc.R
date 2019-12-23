@@ -18,6 +18,7 @@ library(parallel)
 library(stringr)
 library(geosphere)
 library(lmodel2)
+library(viridis)
 
 #library(GWmodel)
 #library(starma)

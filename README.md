@@ -48,10 +48,10 @@ dataSP <- SpatialList[[1]]; data.UTM <- SpatialList[[2]]; sp.grid.UTM <- Spatial
 allanc <- names(data.UTM)[-c(1,2)]
 ```
 
-We then create a spatio-temporal grid spanning the last 10,800 years, in 200-year intervals.
+We then create a spatio-temporal grid spanning the last 10,800 years, in 600-year intervals.
 
 ```
-oldesttime <- -10800; youngesttime <- 0; twindow <- 200; ntslots <- 55
+oldesttime <- -10800; youngesttime <- 0; twindow <- 600; ntslots <- 19
 SPList <- CreateSpatioTemporalGrid(data.UTM, sp.grid.UTM, ntslots,oldesttime,youngesttime)
 dataTM <- SPList[[1]]; grid.ST <- SPList[[2]]; rawtimegrid <- SPList[[3]]; tm.grid <- SPList[[4]]
 ```

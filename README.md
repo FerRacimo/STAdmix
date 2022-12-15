@@ -24,7 +24,6 @@ Then, we load the labels for all individuals (a fam file in plink format), the a
 ```
 famfile <- "Data/ancient_modernEurope.fam"
 ancestryfile <- "qpas_results/K4.Q.matrix"
-ancall <- c("ANCE1","ANCE2","ANCE3","ANCE4")
 timelocfile <- "Data/indstokeep.txt"
 combined <- readkgfiles(famfile,ancestryfile,timelocfile,type="ohana",allowmissloc=TRUE,oldesttime=13000,minlat=35,maxlat=72,minlon=-20,maxlon=80)
 ```

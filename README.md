@@ -38,10 +38,10 @@ projection(data)=CRS(projectiontype)
 data.UTM <- spTransform(data,CRS(projectiontype))
 ```
 
-We now create a spatial grid with 200 grid points.
+We now create a spatial grid with 1000 grid points.
 
 ```
-numgridpoints <- 200
+numgridpoints <- 1000
 SpatialList <- CreateSpatialGrid(combined,landfeatures,numgridpoints,projectiontype)
 dataSP <- SpatialList[[1]]; data.UTM <- SpatialList[[2]]; sp.grid.UTM <- SpatialList[[3]]; ReducedMap <- SpatialList[[4]]
 allanc <- names(data.UTM)[-c(1,2)]
